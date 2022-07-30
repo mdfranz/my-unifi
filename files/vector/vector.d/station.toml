@@ -1,0 +1,103 @@
+[transforms.station]
+type = "remap"
+inputs = ["rsyslog.station"]
+drop_on_error = false
+drop_on_abort = false
+source = '''
+.service = "station"
+.message = string!(.message)
+.message = replace(.message, "- acla, flags: 0x1", "")
+
+# Attempt to parse radius accounting (custom parsing).
+if exists(.message) && starts_with(.message, "rai") {
+  parsed, err = parse_regex(.message, r'^(?P<radio>rai[0-9]+): STA (?P<sta>[a-f0-9:]+) RADIUS: (?P<message>.+)$')
+  if err == null {
+    . |= parsed
+    .program = "radius"
+  }
+
+} else if starts_with(.message, "[STA-TRACKER].") {
+  . |= parse_regex!(.message, r'^\[STA-TRACKER\]\.(?P<module_path>[^:]+)\(\): (?P<message>.+)$')
+
+  parsed, err = object(parse_json!(replace(.message, "\\\"", "\"")))
+  if err == null {
+    . = merge(., parsed)
+    del(.message)
+  }
+
+} else if exists(.message) && starts_with(.message, "wireless_agg_stats.") {
+  # Attempt to parse as key=value pairs.
+  . |= parse_regex!(.message, r'^(?P<event_type>[[:word:]]+)\.(?P<event_name>[[:word:]]+)\(\): (?P<message>.+)$')
+  parsed, err = parse_key_value(.message)
+  if err == null {
+      del(.message)
+      . |= parsed
+  }
+}
+
+'''
+
+
+[[tests]]
+name = "station_radius"
+  [[tests.inputs]]
+    insert_at = "station"
+    type = "raw"
+    value = "rai0: STA ff:ff:ff:ff:ff:ff RADIUS: starting accounting session 4F83E04CDFD28433"
+  [[tests.outputs]]
+    extract_from = "station"
+  [[tests.outputs.conditions]]
+    type = "vrl"
+    source = '''
+    .message == "starting accounting session 4F83E04CDFD28433" &&
+    .program == "radius" &&
+    .radio == "rai0" &&
+    .service  == "station" &&
+    .sta == "ff:ff:ff:ff:ff:ff"
+    '''
+
+
+[[tests]]
+name = "station_tracker"
+  [[tests.inputs]]
+    insert_at = "station"
+    type = "raw"
+    value = "[STA-TRACKER].stahtd_dump_event(): {\"event_type\":\"fixup\",\"mac\":\"ee:ee:ee:ee:ee:ee\",\"message_type\":\"STA_ASSOC_TRACKER\",\"auth_ts\":\"0.0\",\"vap\":\"rai0\",\"assoc_status\":\"0\",\"event_id\":\"1\",\"dns_resp_seen\":\"yes\"}"
+  [[tests.outputs]]
+    extract_from = "station"
+  [[tests.outputs.conditions]]
+    type = "vrl"
+    source = '''
+    .assoc_status == "0" &&
+    .auth_ts == "0.0" &&
+    .dns_resp_seen == "yes" &&
+    .event_id == "1" &&
+    .event_type  == "fixup" &&
+    .mac == "ee:ee:ee:ee:ee:ee" &&
+    .message_type == "STA_ASSOC_TRACKER" &&
+    .module_path == "stahtd_dump_event" &&
+    .service  == "station" &&
+    .vap == "rai0"
+    '''
+
+[[tests]]
+name = "station_wireless_stats"
+  [[tests.inputs]]
+    insert_at = "station"
+    type = "raw"
+    value = "wireless_agg_stats.log_sta_anomalies(): bssid=ee:ee:ee:ee:ee:ee radio=rai0 vap=rai0 sta=ff:ff:ff:ff:ff:ff satisfaction_now=77 anomalies=tcp_latency"
+  [[tests.outputs]]
+    extract_from = "station"
+  [[tests.outputs.conditions]]
+    type = "vrl"
+    source = '''
+    .anomalies == "tcp_latency" &&
+    .bssid == "ee:ee:ee:ee:ee:ee" &&
+    .event_name == "log_sta_anomalies" &&
+    .event_type == "wireless_agg_stats" &&
+    .radio == "rai0" &&
+    .satisfaction_now == "77" &&
+    .service  == "station" &&
+    .sta == "ff:ff:ff:ff:ff:ff" &&
+    .vap == "rai0"
+    '''

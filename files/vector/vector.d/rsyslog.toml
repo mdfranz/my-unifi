@@ -1,0 +1,119 @@
+# UDM rsyslog Log Files
+# =====================
+[sources.rsyslog_files_raw]
+type = "file"
+read_from = "end"
+include = [
+    "/data/unifi/logs/remote/192.*.log",
+    "/data/unifi/logs/remote/127.0.0.1.log",
+]
+
+[transforms.rsyslog_all]
+type = "remap"
+inputs = ["rsyslog_files_raw"]
+drop_on_error = false
+drop_on_abort = false
+source = '''
+### Useful for debugging, leave commented when not in use:
+## .raw_msg = string(.message)
+
+.message = strip_whitespace(strip_ansi_escape_codes(string!(.message)))
+.checksum = sha1(encode_json(.))
+
+.source  = "rsyslog"
+.program = "undefined"
+.service = "undefined"
+
+# Parse the 1st (main) leading timestamp.
+. |= parse_regex!(.message, r'^(?P<timestamp>[^ ]+) (?P<message>.+)$')
+'''
+
+[transforms.rsyslog_all_host_info]
+type = "remap"
+inputs = ["rsyslog_all"]
+drop_on_error = false
+drop_on_abort = false
+source = '''
+if exists(.file) {
+  # Set the host ID/IP from the logfile name.
+  .log_name = replace(replace!(.file, ".log", ""), "/data/unifi/logs/remote/", "")
+  host_parts = split(.log_name, "_", limit: 2)
+  .host_ip = host_parts[0]
+  if .host_ip == "127.0.0.1" { .host_ip = "192.168.0.1" }
+  if length(host_parts) == 2 { .host_id = host_parts[1] }
+  del(.log_name)
+  del(.file)
+}
+
+# Parse syslog facility.
+if starts_with(.message, "<") {
+  .facility = "defined"
+  parsed, err = parse_regex(.message, r'^<(?P<facility>\d+)>(?:\w+[[:blank:]]+\d+ \d+:\d+:\d+) (?P<message>.+)$')
+  if err == null {
+    .message = parsed.message
+    .facility = to_syslog_facility(parse_int!(parsed.facility)) ?? parsed.facility
+  }
+}
+
+# Parse hostname. host id & firmware version.
+. |= parse_regex(.message, r'^(?P<host>\w+),(?P<host_id>\w+),(?P<host_os>[A-Za-z0-9\-\+\.]+) (?P<message>.+)$') ??
+     parse_regex(.message, r'^(?P<host>\w+) (?P<host_id>\w+?),(?P<host_os>[A-Za-z0-9\-\+\.]+): (?P<message>.+)$') ??
+     {}
+'''
+
+[transforms.rsyslog_after_all]
+type = "remap"
+inputs = ["rsyslog_all_host_info"]
+drop_on_error = false
+drop_on_abort = false
+source = '''
+# Parse system program (and PID if applicable)
+. |= parse_regex(.message, r'^(?P<program>[a-zA-Z0-9\-/]+)\[(?P<pid>\d+)\]: (?P<message>.+)$') ??
+     parse_regex(.message, r'^(?P<program>[a-zA-Z0-9\-/]+): (?P<message>.+)$') ??
+     {}
+
+
+if starts_with(.message, "{28aa ec22} ") { .message = replace(.message, "{28aa ec22} ", "") }
+
+if starts_with(.message, "80211> ") {
+    .message = replace(.message, "80211> ", "")
+    .program = "802.11"
+    .service = "auth"
+}
+
+# Try to identify the correct service these logs relate to.
+if !exists(.service) || bool(match_any(string(.service), [r'undefined', r'libubnt'])) {
+    if exists(.unknown_id) || match_any(string(.program), [r'mcad', r'stahtd', r'hostapd']) {
+      .service = "station"
+    } else if .program == "dropbear" {
+      .service = "ssh"
+    } else if .program == "kernel" && contains(.message, "OUT=") {
+      .service = "firewall"
+      .program = "nftables"
+      del(.facility)
+    } else if .program == "switch" && starts_with(.message, "DHCP_SNP:") {
+      .service = "dhcp-snp"
+    } else {
+      .service = .program
+    }
+}
+
+
+# ts, err = parse_timestamp(.timestamp, "%Y-%m-%dT%H:%M:%S,%3f")
+# if err == null { .timestamp = ts }
+
+# if exists(.facility) { .facility = to_syslog_facility!(int!(.facility)) }
+
+# Attempt to parse `program[1234]:` off the front of syslog messages.
+parsed, err = parse_regex(.message, r'^(?P<program>\w+)\[(?P<pid>\d+)\]: (?P<message>.+)$')
+if err == null { . = merge(., parsed) }
+'''
+
+[transforms.rsyslog]
+type = "route"
+inputs = ["rsyslog_after_all"]
+route.firewall = ".service == \"firewall\""
+route.ssh      = ".service == \"ssh\""
+route.auth     = "match_any(string!(.program), [r'mcad', r'stahtd', r'hostapd']) == true"
+route.station  = "match_any(string!(.program), [r'mcad', r'stahtd', r'hostapd']) == true"
+route.other    = "match_any(string!(.service), [r'mcad', r'libubnt',r'stahtd', r'ssh', r'firewall']) == false"

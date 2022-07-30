@@ -1,0 +1,11 @@
+funcy
+boltons
+bpython
+textual
+rich
+toml
+click
+peewee
+requests
+scapy
+sh

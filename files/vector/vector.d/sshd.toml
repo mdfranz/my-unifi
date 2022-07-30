@@ -1,0 +1,22 @@
+
+[transforms.ssh]
+type = "remap"
+inputs = ["rsyslog.ssh"]
+drop_on_error = false
+drop_on_abort = true
+source = '''
+.service = "ssh"
+
+if starts_with(.message, "Pubkey auth") {
+  . |= parse_regex!(.message, r'^(?P<message>(\w+)+) for \'(?P<local_user>\w+)\' with key sha1!! (?P<key_sha1>[0-9a-f:]+) from (?P<src.ip>[0-9\.:]+)$')
+  .level = warn
+} else if ends_with(.message, "Exit before auth (user 'root', 0 fails): Exited normally") {
+  .level = "info"
+  abort
+} else if starts_with(.message, "Child connection from 127.0.0.1:") {
+  .level = "debug"
+  abort
+}
+
+'''
+

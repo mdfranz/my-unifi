@@ -1,0 +1,36 @@
+[[tests]]
+name = "rsyslog"
+
+  [[tests.inputs]]
+    insert_at = "rsyslog_all"
+    type = "raw"
+    value = "2021-08-28T18:29:53,840 <4>Aug 28 14:29:53 DummyAP f00b4db00b5,UAP-HD-IW-5.60.9+12980: kernel: 80211> KeyDel STA(5C:52:1E:96:AA:9C) ==>"
+  [[tests.outputs]]
+    extract_from = "rsyslog_after_all"
+  [[tests.outputs.conditions]]
+    type = "vrl"
+    source = '''
+    .facility == "auth"
+    .program  == "802.11"
+    .host_id  == "f00b4db00b5"
+    .host     == "DummyAP"
+    .host_os  == "UAP-HD-IW-5.60.9+12980"
+    .service  == "auth"
+    '''
+
+  [[tests.inputs]]
+    insert_at = "rsyslog_all"
+    type = "raw"
+    value = "2021-08-28T18:29:53,843 <30>Aug 28 14:29:53 DummyAP f00b4db00b5,UAP-HD-IW-5.60.9+12980: hostapd: ra0: STA 5c:52:1e:96:aa:9c IEEE 802.11: disassociated"
+  [[tests.outputs]]
+    extract_from = "rsyslog_after_all"
+  [[tests.outputs.conditions]]
+    type = "vrl"
+    source = '''
+    .facility == "30"
+    .program  == "hostapd"
+    .host_id  == "f00b4db00b5"
+    .host     == "DummyAP"
+    .host_os  == "UAP-HD-IW-5.60.9+12980"
+    .service  == "station"
+    '''

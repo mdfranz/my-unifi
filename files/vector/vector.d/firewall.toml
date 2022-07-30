@@ -1,0 +1,74 @@
+[transforms.firewall_remap]
+type = "remap"
+inputs = ["rsyslog.firewall"]
+drop_on_error = false
+drop_on_abort = false
+source = '''
+.level = "info"
+.service = "firewall"
+.program = "nftables"
+
+. |= parse_regex!(string!(.message), r'^\[(?P<rule_id>\d+)\.(?P<rule_subid>\d+)\] (?P<message>.+)$')
+packet = parse_key_value!(downcase(string(.message)))
+
+# most protocols come through as numbers, only TCP/UDP by default get named in log output.
+if to_string(packet.proto) == to_string(1) {
+  .proto = "icmp"
+} else if to_string(packet.proto) == to_string(2) {
+  .proto = "igmp"
+} else {
+  .proto = to_string!(packet.proto)
+}
+del(packet.proto)
+
+# source/dest ip/port
+.dst.ip = packet.dst
+.src.ip = packet.src
+.src.port = packet.spt
+.dst.port = packet.dpt
+del(packet.src)
+del(packet.dst)
+del(packet.dpt)
+del(packet.spt)
+
+if exists(packet.out) && starts_with(packet.out, "mac=") {
+    packet.mac = replace!(packet.out, "mac=", "", 1)
+    packet.out = ""
+}
+
+# Parse the MAC frame.
+if is_string(packet.mac) && length(packet.mac) >= 32 {
+  .dst.mac = slice!(packet.mac,  0, 17)
+  .src.mac = slice!(packet.mac,  18, -6)
+  .ethertype = slice!(packet.mac, -5)
+  del(packet.mac)
+}
+
+
+if exists(.ethertype) {
+  if .ethertype == "08:00" { .ethertype = "IPv4" }
+  if .ethertype == "86:DD" { .ethertype = "IPv6" }
+}
+
+if .src.mac == "76:ac:b9:da:98:ba" { .src.via = "gateway" }
+if .dst.mac == "76:ac:b9:da:98:ba" { .dst.via = "gateway" }
+if exists(.message) { del(.message) }
+. = merge(., packet)
+
+'''
+
+[transforms.firewall]
+type = "dedupe"
+cache.num_events = 15
+inputs = ["firewall_remap"]
+fields.match = [
+  "src.ip",
+  "dst.ip",
+  "dst.port",
+  "in", "out",
+  "ethertype",
+  "ttl",
+  "proto",
+  "syn",
+  "ack",
+]

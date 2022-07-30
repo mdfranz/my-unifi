@@ -1,0 +1,8 @@
+#!/bin/ash
+vector_dir="/mnt/data_ext/vector"
+export VECTOR_CONFIG_DIR="${vector_dir}/vector.d"
+export VECTOR_WATCH_CONFIG="${vector_dir}/vector.d/*.toml"
+export VECTOR_LOG_FORMAT="text"
+export VECTOR_COLOR="always"
+
+cd $vector_dir && ./bin/vector "$@"

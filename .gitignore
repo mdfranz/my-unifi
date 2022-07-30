@@ -1,0 +1,7 @@
+vector.d/99-sinks.toml
+vector.toml
+bin/*
+.venv
+*.sqlite3
+*.ipynb
+__pycache__

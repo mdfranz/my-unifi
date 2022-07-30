@@ -1,0 +1,29 @@
+[sinks.logger]
+type = "datadog_logs"
+encoding.codec = "json"
+default_api_key = "cccccccccccccccccccccccccccccccc"
+inputs = ["datadog_logs"]
+
+[sinks.metrics]
+type = "datadog_metrics"
+api_key = "cccccccccccccccccccccccccccccccc"
+inputs = ["internal_metrics", "host_metrics"]
+
+[transforms.datadog_logs]
+type = "remap"
+drop_on_error = false
+drop_on_abort = false
+source = '''
+.host = "gateway"
+'''
+inputs = [
+    # "internal_logs",
+    # "parse_var_log_files",
+    "messages.kernel",
+    "cronjobs_log",
+    "unifi_core",
+    "firewall_messages_deduped",
+    "messages.ssh",
+    "messages.dhcp",
+    "internal_logs",
+]

@@ -1,0 +1,4 @@
+*datadog*.toml
+*.local.toml
+*.secret.toml
+*.private.toml

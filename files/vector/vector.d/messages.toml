@@ -1,0 +1,30 @@
+# DEPRECATED
+# ==========
+#
+#   # All Syslog-formatted logs
+#   [sources.syslog_messages]
+#   type = "file"
+#   include = ["/var/log/messages"]
+#   read_from = "end"
+
+#   [transforms.parse_messages]
+#   type = "remap"
+#   inputs = ["syslog_messages"]
+#   drop_on_error = false
+#   drop_on_abort = false
+#   source = '''
+#   . = parse_grok!(string!(.message), "%{SYSLOGTIMESTAMP:timestamp} %{IPORHOST:host} %{WORD:facility}.%{LOGLEVEL:level} %{DATA:program}: %{GREEDYDATA:message}")
+#   .source = "file"
+#   .host = get_hostname!()
+#   .source_file = "/var/log/messages"
+
+#   if starts_with(.program, "dropbear") { .program = "dropbear"
+#   } else if starts_with(.program, "radiusd") { .program = "radiusd"
+#   } else if starts_with(.program, "dnsmasq-dhcp") { .program = "dnsmasq-dhcp" }
+#   '''
+
+#   [transforms.messages]
+#   type = "route"
+#   inputs = ["parse_messages"]
+#   route.firewall = ".program == \"kernel\" && contains(string!(.message), \"OUT=\")"
+#   route.other = ".program != \"kernel\" || !contains(string!(.message), \"OUT=\")"

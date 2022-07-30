@@ -1,0 +1,91 @@
+# [sources.unifi_core_logfiles]
+# type = "file"
+# ignore_older_secs = 86400 #1day
+# read_from = "end"
+# include = [
+# "/mnt/data/unifi-os/unifi-core/logs/app.log",
+# "/mnt/data/unifi-os/unifi-core/logs/backup.log",
+# "/mnt/data/unifi-os/unifi-core/logs/cloud.backup.log",
+# "/mnt/data/unifi-os/unifi-core/logs/cloud.invites.log",
+# #"/mnt/data/unifi-os/unifi-core/logs/cloud.log",
+# #"/mnt/data/unifi-os/unifi-core/logs/cloud1.log",
+# #"/mnt/data/unifi-os/unifi-core/logs/cloud2.log",
+# "/mnt/data/unifi-os/unifi-core/logs/controllers.log",
+# "/mnt/data/unifi-os/unifi-core/logs/dpkg-cache.log",
+# "/mnt/data/unifi-os/unifi-core/logs/errors.log",
+# #"/mnt/data/unifi-os/unifi-core/logs/errors1.log",
+# "/mnt/data/unifi-os/unifi-core/logs/firmware.log",
+# "/mnt/data/unifi-os/unifi-core/logs/health.log",
+# "/mnt/data/unifi-os/unifi-core/logs/http.apiProxy.log",
+# "/mnt/data/unifi-os/unifi-core/logs/http.log",
+# "/mnt/data/unifi-os/unifi-core/logs/http.uiProxy.log",
+# "/mnt/data/unifi-os/unifi-core/logs/http.wsProxy.log",
+# "/mnt/data/unifi-os/unifi-core/logs/http1.log",
+# "/mnt/data/unifi-os/unifi-core/logs/http2.log",
+# #  "/mnt/data/unifi-os/unifi-core/logs/ipc.log",
+# #  "/mnt/data/unifi-os/unifi-core/logs/ipc.ucp4.log",
+# "/mnt/data/unifi-os/unifi-core/logs/messageBox.log",
+# "/mnt/data/unifi-os/unifi-core/logs/redux.log",
+# "/mnt/data/unifi-os/unifi-core/logs/sdnotify.log",
+# "/mnt/data/unifi-os/unifi-core/logs/system.log",
+# #"/mnt/data/unifi-os/unifi-core/logs/system1.log",
+# "/mnt/data/unifi-os/unifi-core/logs/systemd.log",
+# "/mnt/data/unifi-os/unifi-core/logs/trace.log",
+# "/mnt/data/unifi-os/unifi-core/logs/uum.log",
+# #"/mnt/data/unifi-os/unifi-core/logs/webrtc.log",
+# ]
+
+# [transforms.unifi_core]
+# type = "remap"
+# drop_on_error = false
+# drop_on_abort = false
+# source = '''
+# .service = "unifi-core"
+# .program = parse_regex!(.file, r'^/mnt/data/unifi-os/unifi-core/logs/(\w+)\.log$')
+
+# patterns = ["at"]
+# if starts_with(.message, "at", true) {
+#   abort
+# }
+# '''
+# inputs = ["unifi_core_logfiles"]
+
+# [sources.unifi_core_service_log]
+# type = "file"
+# ignore_older_secs = 86400 #1day
+# read_from = "end"
+# include = ["/mnt/data/unifi-os/unifi-core/logs/service.log"]
+
+# [transforms.unifi_core_service]
+# type = "remap"
+# inputs = ["unifi_core_service_log"]
+# drop_on_error = false
+# drop_on_abort = true
+# source = '''
+# . |= parse_syslog!(string!(.message))
+# .service = "unifi-core"
+# .program = "service"
+# if starts_with(.message, "Error on client scan: send ENETUNREACH 233.89") {
+#   abort
+# }
+# '''
+
+# [sources.unifi_core_discovery_log]
+# type = "file"
+# ignore_older_secs = 86400 #1day
+# read_from = "end"
+# include = ["/mnt/data/unifi-os/unifi-core/logs/discovery.log"]
+
+# [transforms.unifi_core_discovery]
+# type = "remap"
+# inputs = ["unifi_core_discovery_log"]
+# drop_on_error = false
+# drop_on_abort = true
+# source = '''
+# . |= parse_syslog!(string!(.message))
+# .service = "unifi-core"
+# .program = "discovery"
+# if starts_with(.message, "Error on client scan: send ENETUNREACH 233.89") {
+#   abort
+# }
+# '''

@@ -1,0 +1,151 @@
+= My Unifi Stuff
+:toc:
+
+  Originally written in (early to mid) August of 2021; I really struggled to
+  understand parts of the networking stack; I learned a great deal. be careful
+  not to make assumptions, there are things about complex devices like this that
+  can be scary at first, but also..
+
+  Squashed commit history i used to try to diagnose my Unifi AP. Written by
+  DataDog the goal of this project is to forward logs for diagnostics of
+  compromised Unifi devices.
+
+  Its very hard to build trust in something you can't comprehend or explain
+  simply. This is my hope for (more) tools that can do _just that_. Explain all
+  of this very, very, simply.
+
+  Never trust just ONE person. Nor just blindly trust a collective. Find a good
+  company, with good and genuine people. I loved my time at DynDNS and I'm
+  excited to be part of @DigitalOcean. As much as I _do_ love them, I love them
+  enough to say.. don't trust them. Don't trust me. Run the scripts for yourself,
+  lookup the packets, and what they mean. Networks speak a very very simple
+  language. All you have to do is listen, be patient & remain calm in the face of
+  things you dont understand at the time.
+
+  Signed-off-by: Jake <820715+jakelogemann@users.noreply.github.com>
+
+== Specification
+
+=== Network
+
+=== Sub-Networks (VLANs)
+
+- IPv4 addresses match VLAN (_ie._ `192.168.<VLAN>.0/24`)
+
+.Well-known VLANs
+[width="60%",options="header"]
+|==============================================
+| VLAN ID         | Description
+| 0*  | (WILDCARD) MGMT (catch-all)
+| 2   | IoT
+| 3   | Security
+| 30  | Galaxy
+| 40  | Odyssey
+| 50  | Downstairs
+| 60  | Squirrel
+| 66  | Alien (_Not Recognized_)
+| 8   | Default
+| 80  | ToonTown
+|==============================================
+
+**Note**: _VLAN 0 is a catch-all/fallback if a valid VLAN is not assigned._
+
+=== Authentication
+
+- Primarily via RADIUS.
+- Credentials stored in Password Manager.
+- RADIUS ports (1812, 1813) not exposed to users.
+
+=== Service Discovery
+
+* Minimal by Default.
+** mDNS / SSDP / LLDP are prohibited.
+** VLANs should be isolated from each other.
+
+
+=== Gateway _("Controller")_
+
+* Currently: UDMPRO
+* Future: USG-3
+
+==== Ports & Protocols
+
+==== Userland ports
+The following ports **SHOULD** be opened (_only_) to most devices the connect on
+this network. Care **MUST** be given to any ports with asterisks as they signal
+additional considerations must be taken before opening them to users.
+
+."Userland" Ports (open to most devices)
+[width="80%",options="header"]
+|==============================================
+| Protocol | Port number | Usage
+| UDP      | 53          | DNS server.
+| UDP      | 68          | DHCP server.
+| UDP      | 1900*       | SSDP / UPnP (if applicable).
+| TCP      | 8880        | HTTP portal redirection.
+| TCP      | 8843        | HTTPS portal redirection.
+| TCP      | 6789        | UniFi mobile speed test.
+|==============================================
+
+==== Management ports
+The following ports **SHOULD** be opened (_only_) to trusted operators
+that explicitly **NEED** to have access to them.
+
+.Additional management ports for operators (closed to most devices)
+[width="80%",options="header"]
+|==============================================
+| Protocol | Port number | Usage
+| TCP      | 22          | SSH (admin) management shell.
+| TCP      | 80          | HTTP (admin) management UI redirection.
+| TCP      | 443         | HTTPS (admin) management UI.
+|==============================================
+
+==== Infrastructure ports
+
+The following ports **MUST** only be opened to relevant/trusted infrastructure
+that explicitly **MUST** have access to them.
+
+.All infrastructure ports (closed to most devices)
+[width="80%",options="header"]
+|==============================================
+| Protocol | Port number | Usage
+| TCP      | 22          | SSH (admin) management shell.
+| UDP      | 3478        | STUN (admin) operator user interface.
+| UDP      | 5514        | remote syslog capture.
+| TCP      | 8080        | device and application communication.
+| TCP      | 8443        | application GUI/API as seen in a web browser.
+| TCP      | 8880        | HTTP portal redirection.
+| TCP      | 1812        | RADIUS Authentication.
+| TCP      | 1813        | RADIUS Accounting.
+| TCP      | 8843        | HTTPS portal redirection.
+| TCP      | 6789        | UniFi mobile speed test.
+| TCP      | 27117       | local-bound database communication.
+| UDP      | 5656-5699	 | AP-EDU broadcasting.
+| UDP      | 10001	     | device discovery.
+|==============================================
+
+== Well-known ports & protocols
+
+Just a quick reference of some common ports and their usage.
+
+[width="80%",options="header"]
+|==============================================
+| Port(s) | Proto(s) | Description
+| 1812    | TCP   | RADIUS Authentication
+| 1813    | TCP   | RADIUS Accounting
+| 1900    | UDP   | SSDP / UPnP
+| 20, 21  | TCP   | File Transfer Protocol (FTP)
+| 22      | TCP   | Secure Socket Shell (SSH)
+| 23      | TCP   | Telnet
+| 25      | TCP   | SMTP
+| 37      | UDP   | Network Time Protocol (NTP)
+| 53      | UDP   | Domain Name Service (DNS)
+| 5553    | UDP   | Multicast DNS (mDNS)
+| 1883    | TCP   | MQTT
+| 8883    | TCP   | Encrypted MQTT
+| 666[6-9]| TCP   | Instant Relay Chat (IRC)
+| 80, 443 | TCP   | HTTP
+| 853     | UDP   | DNS-over-TLS (DoT)
+| 9       | UDP   | Wake-on-LAN (WOL)
+| 993     | TCP   | IMAP
+|==============================================

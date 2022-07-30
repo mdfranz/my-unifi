@@ -1,0 +1,18 @@
+#!/usr/bin/env -S bash -eu
+vlan_id="${1:-30}"
+start_date=$(date +%Y-%m-%d)
+start_time=$(date +%H:%M:%S)
+save_to_dir="$HOME/pcap/${start_date}/vlan.${vlan_id}/"
+save_as="vlan${vlan_id}.${start_date}@${start_time}.pcap"
+
+test -d "$save_to_dir" || mkdir -vp "$save_to_dir"
+
+set -x; exec sshdump \
+	--extcap-interface=sshdump \
+	--remote-interface="switch0.${vlan_id}" \
+	--remote-host "192.168.0.1" \
+	--remote-port 22 \
+	--remote-username root \
+	--remote-capture-command "tcpdump -l -U -i switch0.${vlan_id} -w -" \
+	--fifo="${save_to_dir}/${save_as}" \
+	--capture
